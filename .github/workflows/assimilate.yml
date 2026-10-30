@@ -1,0 +1,90 @@
+# Intake for claims from brotettes (forks): see ASSIMILATION.md.
+# pull_request_target runs this file AS IT IS ON THE BASE BRANCH, and the judge (assimilate/woodlouse.py)
+# is checked out from the base too. A PR therefore cannot edit its own judge or this workflow.
+# The PR's files are checked out only as data: nothing from the PR is executed, and the job has
+# read-only permissions and no secrets.
+#
+# Two jobs, both required on main (Brief 8, M1). `route` says which route the PR is on; `intake`
+# runs only for a claims/ PR. A core PR therefore shows intake as SKIPPED, never as a green
+# intake: the check no longer reads "verified" for a PR the woodlouse never looked at. GitHub
+# counts a skipped required job as passing, so a core PR is held by CODEOWNERS review, not by
+# this workflow. `route` must be required too: if it fails, intake is skipped, and only a red
+# `route` keeps that PR from merging.
+name: assimilate
+on:
+  pull_request_target:
+permissions:
+  contents: read
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      route: ${{ steps.guard.outputs.route }}
+    steps:
+      - name: allowed base (the default branch only)
+        # The judge below is checked out from the PR's base, and the PR author picks the base.
+        # Any other branch could carry a different judge, so only the default branch may judge.
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$BASE_REF" != "$DEFAULT" ]; then
+            echo "intake PRs must target $DEFAULT, not $BASE_REF"; exit 1
+          fi
+      - name: provenance (which workflow and which revisions judged this PR)
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          echo "workflow file from: $WORKFLOW_SHA"
+          echo "GITHUB_SHA=$GITHUB_SHA GITHUB_REF=$GITHUB_REF"
+          echo "base: $BASE_REF $BASE_SHA   head: $HEAD_REPO $HEAD_SHA"
+      - name: judge (base branch)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: core
+          persist-credentials: false
+      - name: PR (head, read as data)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - name: guard (intake or core?)
+        id: guard
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 core/assimilate/woodlouse.py route "$BASE" "$HEAD" --repo pr
+  intake:
+    needs: route
+    if: needs.route.result == 'success' && needs.route.outputs.route == 'intake'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: judge (base branch)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: core
+          persist-credentials: false
+      - name: claim (PR head, read as data)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - name: woodlouse selftest (every plant must be caught)
+        run: python3 core/assimilate/woodlouse.py selftest
+      - name: intake (guard, then verify each new claim; a core PR fails here)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 core/assimilate/woodlouse.py intake "$BASE" "$HEAD" --repo pr --claims-only

@@ -1,0 +1,7 @@
+# Every path needs the owner's review (Brief 8, M1). The assimilate check passes a core PR as
+# "intake skipped", so this file, not CI, is what holds the judge, the workflows, the ledger and
+# the definitions in README/QUESTION (Brief 8, M4). claims/ is owned too for now: a person merges
+# every PR until the remote fork test (H1) has run.
+# Takes effect only with branch protection on main: "Require review from Code Owners", and the
+# required checks `route` and `intake`.
+*  @dougbristor

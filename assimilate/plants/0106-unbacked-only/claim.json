@@ -1,0 +1,8 @@
+{
+  "atoms": [
+    {
+      "kind": "forall-levels",
+      "statement": "cells(n, 0.08) levels off for every n"
+    }
+  ]
+}

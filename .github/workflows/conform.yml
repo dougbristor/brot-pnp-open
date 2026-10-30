@@ -1,0 +1,27 @@
+# Runs each block's conformance check on every push and pull request.
+# bristor_sqrt_all runs with --selftest: it also plants five known faults and fails unless each one is caught,
+# so a green tick means the check itself can still fire.
+name: conform
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  conform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4, pinned by SHA
+        with:
+          node-version: 22
+      - name: bristor_square_jacobian
+        working-directory: blocks/bristor_square_jacobian
+        run: node conform.mjs
+      - name: cramer3_solve
+        working-directory: blocks/cramer3_solve
+        run: node conform.mjs
+      - name: bristor_sqrt_all (+ planted faults)
+        working-directory: blocks/bristor_sqrt_all
+        run: node conform.mjs --selftest
