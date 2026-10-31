@@ -32,7 +32,7 @@ Then a verdict in one paragraph: **is the backward search cost exponential in th
 ## Controls you must include
 
 - **A control that can fire.** Name the result that would show your cell count is wrong. Build a case where you know the answer, and show your code gets it. Use the case c = (0,0,0), A = (0.3, 0, 0). Every level n ≥ 1 then has **exactly 2** tree points on the real axis (y = z = 0), at x = ±0.3^(1/2ⁿ). The negative one's 6 preimages all leave the axis. Your code must find exactly these.
-- **Root completeness.** If you use your own inverse, check its root counts (2 or 6) against `blocks/bristor_sqrt_all` on at least 1000 random targets. If you use the block, check it against `oracle_elim.py` on at least 200.
+- **Root completeness.** If you use your own inverse, check its root counts (2 or 6) against `blocks/bristor_sqrt_all/oracle_elim.py` (exact elimination) on at least 1000 targets, at least 200 of them placed near the caustic on purpose: random targets almost never land where roots go missing. If you use the block itself, check it the same way; it can miss a pair near the cusps (its README, Caveats).
 - **Merge sensitivity.** Shift the grid by ε/2 in each axis and report how much cells(n, ε) changes.
 
 ## Out of scope

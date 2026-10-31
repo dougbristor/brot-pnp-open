@@ -23,7 +23,7 @@ B(x, y, z)   = (x² − y² − z²,  y(2x − z),  z(2x + y))
 F_c(w)       = B(w) + c
 ```
 
-Every real target t has **2 or 6** real square roots under B, never 4 (generic case). `blocks/bristor_sqrt_all` returns all of them. The exact definitions (ball, cells, backward tree) are in `QUESTION.md`.
+Every real target t has **2 or 6** real square roots under B, never 4 (generic case). `blocks/bristor_sqrt_all` finds them quickly from a lookup table, but it is not a proof: near the cusps of the 6-root region it can return 2 roots as `complete` where there are 6 (its README, Caveats). The exact definitions (ball, cells, backward tree) are in `QUESTION.md`.
 
 ## What is here
 

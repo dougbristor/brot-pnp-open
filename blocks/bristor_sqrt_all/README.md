@@ -20,13 +20,19 @@ the cusps, 2.
 
 | status | meaning |
 |---|---|
-| `complete` | 6 roots; or 2 roots with no 6-root pixel in the 3×3 neighbourhood |
+| `complete` | 6 roots; or 2 roots with no 6-root pixel in the 3×3 neighbourhood. A table claim, not a proof: see Caveats |
 | `edge` | 2 roots near the cap's edge. Usually right, but a hidden pair is not ruled out: treat as unresolved if you need certainty |
 | `unresolved` | the count still breaks 2-or-6 after 16 starts |
 | `zero` | t = 0, root 0 |
 
 **Caveats.** On the caustic itself (measure zero) the double root is dropped and the 2 simple roots come
-back as `edge`. A `complete` 2 is a table claim, not a proof. The table is for the shipped signs only.
+back as `edge`. The table is for the shipped signs only.
+
+**A `complete` 2 can be wrong.** The 6-root cap has cusp tongues thinner than one table pixel (2°). Near lon −179.6°,
+lat −31.7°, v1 returns 2 roots as `complete` on targets that have 6 (4 roots missed; the roots are not close to merging).
+This was found by a completeness check that placed targets on the caustic on purpose; a random bench almost never lands
+there. `conform.mjs` pins three such targets as `caveat-tongue` (documented wrongness; it reports STALE CAVEAT once fixed).
+**If you need certainty in or near the cap, do not trust `complete`:** check the count against `oracle_elim.py`.
 
 **Conformance.** `node conform.mjs [--selftest]`. The selftest plants five known faults and fails unless
 each is caught.

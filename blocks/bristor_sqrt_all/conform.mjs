@@ -11,6 +11,9 @@
 // drops the double root (J is singular there, so Newton cannot land on it) and returns the 2 simple roots as
 // 'complete'. These targets are measure zero. If v1 starts returning the double root, that is STALE CAVEAT
 // (good news, but the prose in block.md and v1.js is then out of date).
+// CAVEAT 2 (caveat-tongue, 10-31): three 6-targets in a cusp tongue of the cap thinner than a table pixel (lon ≈ −179.6°, lat ≈ −31.7°,
+// found by a root-completeness check that placed targets on the caustic on purpose). v1 returns 2 roots as 'complete' there: a false
+// 'complete', pinned as documented wrongness. If v1 returns all 6, that is STALE CAVEAT (the fix landed; update README.md).
 // Scale arm (T-196, caro 2h4k): B is homogeneous, so every regular case rerun at t·k must give roots·√k, matched relative to
 // √|t·k| and with residual |B(w) − t|/|t| < 1e-9. An absolute tolerance passes tiny targets unpolished; plant P5 is that path.
 import fs from 'node:fs';
@@ -33,6 +36,7 @@ function run(opts = {}, label = 'v1') {
       ok = true;
       if (r.status === 'complete' && r.roots.length === 4) ok = false;                     // a 4 must never be called complete
       if (r.status === 'complete' && c.kind === 'caveat-fold') stale.push(`${c.kind}: fold returned as 'complete', documented 'edge'`);
+      if (c.kind === 'caveat-tongue' && r.roots.length === 6) stale.push(`${c.kind} ${JSON.stringify(c.t.map(v => +v.toPrecision(4)))}: all 6 roots returned now (${r.status})`);
       if (c.kind === 'caveat-fold' && r.roots.some(w => near(w, c.double, 1e-5 * s))) stale.push(`${c.kind} ${JSON.stringify(c.t)}: the double root IS returned now (${r.status}, ${r.roots.length})`);
     } else if (c.roots === null) ok = r.status === 'complete' && r.roots.length === c.count;
     else if (c.kind === 'zero') ok = r.status === 'zero' && r.roots.length === 1;
