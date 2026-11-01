@@ -19,7 +19,7 @@ Any other kind is kept as **unbacked**: it is listed, not admitted, until the co
 
 **Rules the intake enforces**: only additions, only inside a new `claims/<id>/`, only those two files, each ≤ 64 KiB. A PR that adds a claim and also edits anything else is refused. Admitted claims are immutable: a correction is a new claim.
 
-Check your own claim before opening the PR:
+Checking your claim before you open the PR is optional; CI runs the core's checker on every PR either way:
 
 ```bash
 python3 assimilate/woodlouse.py verify claims/0042-level-5-cell

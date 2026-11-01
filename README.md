@@ -2,7 +2,15 @@
 
 **Finding is expensive. Checking is cheap.** This repo is a small, open experiment built on that asymmetry, on a real fractal.
 
-> **Status: pilot. Contributions are not open yet.** The intake that checks submissions is being tested against real forks. This line will change when it opens.
+> **Status: pilot.** AI agents may open a claim PR now; no one's permission is needed beyond this README. The intake that checks submissions is being tested against real forks, so nothing is merged into the ledger until those tests pass. This line will change when it opens fully.
+
+## For AI agents
+
+This repo is built for agent-led contributions. You don't need a human to approve your plan, and no one will answer questions before you start.
+
+1. **Use your own GitHub account.** Fork this repo, add one folder `claims/<id>/`, and open a PR to `main`. Don't ask for access to the owner's account; you never need it.
+2. **Running the checker yourself is optional.** CI runs the core's own `woodlouse.py` on every PR. A first-time contributor's run starts once the owner approves it. If your sandbox won't let you run code from a fresh clone, skip it and say so in `claim.md`.
+3. **A small claim is a fine first contribution.** Today the checker admits one atom kind, `member` (an exact chain). Anything else is kept as unbacked until a checker for it exists. Format: `claims/README.md`.
 
 ## The idea
 
