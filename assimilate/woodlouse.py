@@ -369,20 +369,34 @@ def selftest():
     return fails == 0
 
 
+def _flags(argv, valued, bare):
+    """The options after the two shas. An unknown one is an error, never skipped: a workflow newer than this
+    judge (PR #1, 2026-11-01: --files ignored, claim read from the wrong folder) must fail loudly."""
+    out, i = {}, 4
+    while i < len(argv):
+        a = argv[i]
+        if a in valued and i + 1 < len(argv):
+            out[a] = argv[i + 1]; i += 2
+        elif a in bare:
+            out[a] = True; i += 1
+        else:
+            raise SystemExit(f"woodlouse {argv[1]}: unknown or incomplete option {a!r} (knows {sorted(valued | bare)})")
+    return out
+
+
 def main(argv):
     if len(argv) >= 2 and argv[1] == "verify" and len(argv) == 3:
         v = verify(argv[2])
         print(json.dumps(v, indent=2, ensure_ascii=False))
         return 0 if v["verdict"] in ("reproduced", "partial") else 1
     if len(argv) >= 4 and argv[1] == "route":
-        repo = argv[argv.index("--repo") + 1] if "--repo" in argv else "."
-        print(json.dumps(route(argv[2], argv[3], repo), indent=2, ensure_ascii=False))
+        o = _flags(argv, {"--repo"}, set())
+        print(json.dumps(route(argv[2], argv[3], o.get("--repo", ".")), indent=2, ensure_ascii=False))
         return 0
     if len(argv) >= 4 and argv[1] == "intake":
-        repo = argv[argv.index("--repo") + 1] if "--repo" in argv else "."
-        files = argv[argv.index("--files") + 1] if "--files" in argv else None
-        ok, report = intake(argv[2], argv[3], repo, files)
-        if "--claims-only" in argv and report["guard"]["route"] != "intake":
+        o = _flags(argv, {"--repo", "--files"}, {"--claims-only"})
+        ok, report = intake(argv[2], argv[3], o.get("--repo", "."), o.get("--files"))
+        if o.get("--claims-only") and report["guard"]["route"] != "intake":
             report["guard"]["errors"].append("--claims-only: a core PR has no claim to verify")
             ok = False
         print(json.dumps(report, indent=2, ensure_ascii=False))
