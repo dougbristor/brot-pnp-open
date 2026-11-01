@@ -1,6 +1,10 @@
 # Intake for claims from brotettes (forks): see ASSIMILATION.md.
-# pull_request_target runs this file AS IT IS ON THE BASE BRANCH, and the judge (assimilate/woodlouse.py)
-# is checked out from the base too. A PR therefore cannot edit its own judge or this workflow.
+# pull_request_target runs this file AS IT IS ON THE BASE BRANCH (its tip when the event fired: github.sha),
+# and the judge (assimilate/woodlouse.py) is checked out from that SAME commit. A PR therefore cannot edit its
+# own judge or this workflow, and the two always match. (Not from the PR's recorded base.sha: that is the
+# base when the PR was opened or last pushed, and goes stale when main moves. On PR #1, 2026-11-01, the new
+# workflow ran the old judge from base.sha, which did not know --files, and rejected a good claim.)
+# base.sha is used only as the diff's base, to say what the PR changes.
 # The PR is never checked out. Its head is fetched into core/ as git objects only (no working tree,
 # no hooks, no attributes applied), git diffs it there, and only the head's claims/ tree is unpacked,
 # into pr/, for verify to read as data. Nothing from the PR is executed, and the job has read-only
@@ -46,10 +50,10 @@ jobs:
           echo "workflow file from: $WORKFLOW_SHA"
           echo "GITHUB_SHA=$GITHUB_SHA GITHUB_REF=$GITHUB_REF"
           echo "base: $BASE_REF $BASE_SHA   head: $HEAD_REPO $HEAD_SHA"
-      - name: judge (base branch)
+      - name: judge (the default branch's tip, the same commit as this workflow)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           path: core
           fetch-depth: 0
           persist-credentials: false
@@ -75,10 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: judge (base branch)
+      - name: judge (the default branch's tip, the same commit as this workflow)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           path: core
           fetch-depth: 0
           persist-credentials: false
