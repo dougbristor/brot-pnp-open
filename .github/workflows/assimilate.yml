@@ -1,8 +1,11 @@
 # Intake for claims from brotettes (forks): see ASSIMILATION.md.
 # pull_request_target runs this file AS IT IS ON THE BASE BRANCH, and the judge (assimilate/woodlouse.py)
 # is checked out from the base too. A PR therefore cannot edit its own judge or this workflow.
-# The PR's files are checked out only as data: nothing from the PR is executed, and the job has
-# read-only permissions and no secrets.
+# The PR is never checked out. Its head is fetched into core/ as git objects only (no working tree,
+# no hooks, no attributes applied), git diffs it there, and only the head's claims/ tree is unpacked,
+# into pr/, for verify to read as data. Nothing from the PR is executed, and the job has read-only
+# permissions and no secrets. (actions/checkout refuses a fork's head under pull_request_target, and
+# that refusal is kept: first seen on PR #1, the first real fork, 2026-11-01.)
 #
 # Two jobs, both required on main (Brief 8, M1). `route` says which route the PR is on; `intake`
 # runs only for a claims/ PR. A core PR therefore shows intake as SKIPPED, never as a green
@@ -48,20 +51,24 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: core
-          persist-credentials: false
-      - name: PR (head, read as data)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
           fetch-depth: 0
           persist-credentials: false
+      - name: PR head (git objects only, never checked out)
+        # refs/pull/N/head lives on the base repo for same-repo and fork PRs alike. If the head moved
+        # since this event, the sha check fails closed; the new push starts its own run.
+        shell: bash
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git -C core fetch --no-tags origin "+refs/pull/${PR}/head:refs/pr/head"
+          test "$(git -C core rev-parse refs/pr/head)" = "$HEAD"
       - name: guard (intake or core?)
         id: guard
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: python3 core/assimilate/woodlouse.py route "$BASE" "$HEAD" --repo pr
+        run: python3 core/assimilate/woodlouse.py route "$BASE" "$HEAD" --repo core
   intake:
     needs: route
     if: needs.route.result == 'success' && needs.route.outputs.route == 'intake'
@@ -73,18 +80,27 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: core
-          persist-credentials: false
-      - name: claim (PR head, read as data)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4, pinned by SHA
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
           fetch-depth: 0
           persist-credentials: false
+      - name: PR head (git objects only, never checked out)
+        shell: bash
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git -C core fetch --no-tags origin "+refs/pull/${PR}/head:refs/pr/head"
+          test "$(git -C core rev-parse refs/pr/head)" = "$HEAD"
+      - name: claim files (the head's claims/ tree only, unpacked as data)
+        shell: bash
+        env:
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir pr
+          git -C core archive --format=tar "$HEAD" claims/ | tar -x --no-same-owner --no-same-permissions -C pr
       - name: woodlouse selftest (every plant must be caught)
         run: python3 core/assimilate/woodlouse.py selftest
       - name: intake (guard, then verify each new claim; a core PR fails here)
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: python3 core/assimilate/woodlouse.py intake "$BASE" "$HEAD" --repo pr --claims-only
+        run: python3 core/assimilate/woodlouse.py intake "$BASE" "$HEAD" --repo core --files pr --claims-only

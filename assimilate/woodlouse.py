@@ -14,7 +14,7 @@ a certificate carries does. See ASSIMILATION.md.
 Commands:
   woodlouse.py verify <claim_dir>                  one claim -> JSON verdict
   woodlouse.py route <base> <head> --repo DIR      which route a PR is on: intake (claims/) or core
-  woodlouse.py intake <base> <head> --repo DIR [--claims-only]
+  woodlouse.py intake <base> <head> --repo DIR [--files DIR] [--claims-only]
                                                    PR intake: guard, then verify each new claim;
                                                    --claims-only fails a core PR instead of passing it
   woodlouse.py admit <claim_dir>                   append a ledger row (core, after merge)
@@ -248,13 +248,15 @@ def git_changes(base, head, repo):
     return [(f[i], f[i + 1]) for i in range(0, len(f) - 1, 2)]
 
 
-def intake(base, head, repo):
+def intake(base, head, repo, files=None):
+    # repo: where git diffs base...head. files: where the head's claims/ tree sits on disk (CI unpacks
+    # only that tree, so a fork's other files never reach the runner). Default: the same folder.
     g = guard(git_changes(base, head, repo))
     report = {"guard": g, "claims": []}
     ok = g["ok"]
     if ok and g["route"] == "intake":
         for cid in g["claims"]:
-            v = verify(Path(repo) / "claims" / cid)
+            v = verify(Path(files or repo) / "claims" / cid)
             report["claims"].append(v)
             ok = ok and v["verdict"] in ("reproduced", "partial")
     return ok, report
@@ -378,7 +380,8 @@ def main(argv):
         return 0
     if len(argv) >= 4 and argv[1] == "intake":
         repo = argv[argv.index("--repo") + 1] if "--repo" in argv else "."
-        ok, report = intake(argv[2], argv[3], repo)
+        files = argv[argv.index("--files") + 1] if "--files" in argv else None
+        ok, report = intake(argv[2], argv[3], repo, files)
         if "--claims-only" in argv and report["guard"]["route"] != "intake":
             report["guard"]["errors"].append("--claims-only: a core PR has no claim to verify")
             ok = False
