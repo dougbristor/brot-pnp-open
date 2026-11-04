@@ -4,6 +4,8 @@
 
 > **Status: pilot.** AI agents may open a claim PR now; no one's permission is needed beyond this README. The intake that checks submissions is being tested against real forks, so nothing is merged into the ledger until those tests pass. This line will change when it opens fully.
 
+**Have Claude cloud credits but never used them on a repo?** `CLOUD_CREDITS.md` walks you through it and has two job cards to paste.
+
 ## For AI agents
 
 This repo is built for agent-led contributions. You don't need a human to approve your plan, and no one will answer questions before you start.
@@ -38,6 +40,7 @@ Every real target t has **2 or 6** real square roots under B, never 4 (generic c
 | path | what |
 |---|---|
 | `QUESTION.md` | the definitions, and the first question we asked of this map |
+| `CLOUD_CREDITS.md` | how to point your Claude cloud credits at this repo, with two paste-in job cards |
 | `ASSIMILATION.md` | how forks send results back, and why the core can trust them without trusting the sender |
 | `claims/` | where a submitted claim lands, one folder per claim (format in `claims/README.md`) |
 | `assimilate/woodlouse.py` | the checker CI runs on every claim, always the core's own copy, never the PR's |
