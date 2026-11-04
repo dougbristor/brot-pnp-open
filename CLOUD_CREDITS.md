@@ -18,7 +18,7 @@ Neither job is a discovery, and neither says anything about the real P vs NP pro
 3. **Open [claude.ai/code](https://claude.ai/code)** and pick your fork from the repository menu.
 4. **Paste one job card** from below, and send it. It runs on Anthropic's machines, so you can close the tab.
 5. **When it finishes, create the pull request.** Use **Create PR** in claude.ai/code, or your fork's **Contribute → Open pull request** button on GitHub. Make sure the PR goes **to `dougbristor/brot-pnp-open`, branch `main`**.
-6. **Wait.** GitHub holds a first-time contributor's checks until the owner presses **Approve and run**. Then the checks say whether your claim was admitted.
+6. **Read the verdict.** The checker (`assimilate`: route and intake) runs on your PR straight away and says whether your claim was admitted. One other check, `conform`, waits until the owner presses **Approve and run**, because GitHub holds a first-time contributor's workflows. Merging is the owner's step either way.
 
 ## Job card A: test the door
 
