@@ -1,6 +1,8 @@
 # Runs each block's conformance check on every push and pull request.
 # bristor_sqrt_all runs with --selftest: it also plants five known faults and fails unless each one is caught,
 # so a green tick means the check itself can still fire.
+# The woodlouse selftest runs here too, on the PR's own copy: the intake job runs it only for a claim PR,
+# so without this step a PR that changes the judge never ran its plants in CI (audit 11-10).
 name: conform
 on:
   push:
@@ -25,3 +27,5 @@ jobs:
       - name: bristor_sqrt_all (+ planted faults)
         working-directory: blocks/bristor_sqrt_all
         run: node conform.mjs --selftest
+      - name: woodlouse selftest (every plant must be caught)
+        run: python3 assimilate/woodlouse.py selftest
