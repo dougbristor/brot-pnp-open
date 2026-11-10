@@ -38,13 +38,18 @@ ROOT = HERE.parent
 LEDGER = ROOT / "ledger" / "ledger.jsonl"
 
 CLAIM_FILES = {"claim.json", "claim.md"}
-CLAIM_ID = re.compile(r"^[0-9]{4}-[a-z0-9-]{1,48}$")
+CLAIM_ID = re.compile(r"[0-9]{4}-[a-z0-9-]{1,48}\Z")   # \Z: '$' let "0200-x\n" through (audit 11-10, A)
 MAX_FILE = 64 * 1024        # same cap as the hollow
 MAX_NUM_CHARS = 200         # a rational longer than this is refused, not parsed
 MAX_LEVEL = 64
 RATIONAL = re.compile(r"-?[0-9]+(/[0-9]+|\.[0-9]+)?\Z")   # \Z: '$' would let "1/2\n" through
 KIND_ID = re.compile(r"[a-z][a-z0-9-]{0,31}\Z")              # a kind is a name, never a sentence
 MEMBER_KEYS = {"kind", "c", "A", "n", "chain", "cell"}
+DOC_KEYS = {"atoms"}                                        # claim.json top level (audit 11-10, C)
+# Kind names the core has reserved for checkers it will write (ASSIMILATION.md). Only these reach a
+# ledger row by name; any other kind is recorded there by hash, so a contributor cannot write a slogan
+# into the store as a kind name (audit 11-10, B). The CI report still shows the name to the reviewer.
+RESERVED_KINDS = {"chain", "cover", "forall-levels"}
 CELL_KEYS = {"eps", "index"}
 DEFINITIONS = ("README.md", "QUESTION.md", "claims/README.md")  # what a statement's words mean
 
@@ -57,6 +62,17 @@ OVERREACH = re.compile(
 
 class Bad(Exception):
     pass
+
+
+def _no_repeats(pairs):
+    """object_pairs_hook: a repeated key is refused. json.loads keeps the LAST value, a reader of the
+    file sees the FIRST, so a repeat would let the checked value differ from the shown one (audit 11-10, D)."""
+    seen = {}
+    for k, v in pairs:
+        if k in seen:
+            raise Bad(f"claim.json: repeated key {k[:40]!r} in one object")
+        seen[k] = v
+    return seen
 
 
 # ── exact arithmetic ──────────────────────────────────────────────────────────
@@ -158,7 +174,7 @@ def verify(d):
       partial     some atoms verified, the rest have no checker (they are not admitted)
       held        no atom could be verified"""
     d = Path(d)
-    out = {"claim": d.name, "verdict": "rejected", "statements": [], "unbacked": [],
+    out = {"claim": d.name, "verdict": "rejected", "statements": [], "unbacked": [], "unbacked_ledger": [],
            "errors": [], "prose_flags": []}
     try:
         if not CLAIM_ID.match(d.name):
@@ -175,9 +191,12 @@ def verify(d):
         prose = (d / "claim.md").read_text(encoding="utf-8")
         out["prose_flags"] = sorted({m.group(0).lower() for m in OVERREACH.finditer(prose)})
         try:
-            doc = json.loads((d / "claim.json").read_text(encoding="utf-8"))
+            doc = json.loads((d / "claim.json").read_text(encoding="utf-8"), object_pairs_hook=_no_repeats)
         except json.JSONDecodeError as e:
             raise Bad(f"claim.json: {e}")
+        if isinstance(doc, dict) and set(doc) - DOC_KEYS:
+            # an ignored field would sit on main beside an admitted claim and could say more than it does
+            raise Bad(f"claim.json: unknown top-level fields {sorted(k[:40] for k in set(doc) - DOC_KEYS)}")
         atoms = doc.get("atoms") if isinstance(doc, dict) else None
         if not isinstance(atoms, list) or not atoms:
             raise Bad("claim.json needs a non-empty list 'atoms'")
@@ -193,6 +212,9 @@ def verify(d):
                 shown = repr(kind) if KIND_ID.match(kind) else \
                     f"<not a kind name; sha256 {hashlib.sha256(kind.encode()).hexdigest()[:16]}>"
                 out["unbacked"].append(f"atoms[{i}]: no checker for kind {shown}")
+                kept = repr(kind) if kind in RESERVED_KINDS else \
+                    f"<unreserved kind; sha256 {hashlib.sha256(kind.encode()).hexdigest()[:16]}>"
+                out["unbacked_ledger"].append(f"atoms[{i}]: no checker for kind {kept}")
                 continue
             out["statements"].append(check(a, f"atoms[{i}]"))
         out["sha256"] = claim_hash(d)
@@ -205,10 +227,12 @@ def verify(d):
     except Bad as e:
         out["errors"].append(str(e))
         out["statements"] = []
+        out["unbacked_ledger"] = []
     except (UnicodeDecodeError, RecursionError, ValueError, OSError) as e:
         # hostile input must end in a verdict, not a crash
         out["errors"].append(f"unreadable claim: {type(e).__name__}: {str(e)[:120]}")
         out["statements"] = []
+        out["unbacked_ledger"] = []
     return out
 
 
@@ -288,6 +312,17 @@ def admit(d):
     rows = [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()] if LEDGER.exists() else []
     if any(r["id"] == v["claim"] for r in rows):
         raise SystemExit(f"{v['claim']} is already in the ledger")
+    row = ledger_row(d, v)
+    if row["sha256"] != claim_hash(d):
+        raise SystemExit("not admitted: the claim's bytes changed while it was being checked")
+    LEDGER.parent.mkdir(exist_ok=True)
+    with LEDGER.open("a") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return row
+
+
+def ledger_row(d, v):
+    """The row admit writes, built apart from the write so selftest can check the row itself."""
     defs = hashlib.sha256()
     for name in DEFINITIONS:
         defs.update(name.encode() + b"\0" + (ROOT / name).read_bytes() + b"\0")
@@ -298,14 +333,9 @@ def admit(d):
            "definitions_sha256": defs.hexdigest(),
            "core_commit": commit.stdout.strip() if commit.returncode == 0 else None,
            "python": sys.version.split()[0],
-           "statements": v["statements"], "not_admitted": v["unbacked"],
+           "statements": v["statements"], "not_admitted": v["unbacked_ledger"],
            "prose_flags": v["prose_flags"],
            "admitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-    if row["sha256"] != claim_hash(d):
-        raise SystemExit("not admitted: the claim's bytes changed while it was being checked")
-    LEDGER.parent.mkdir(exist_ok=True)
-    with LEDGER.open("a") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
     return row
 
 
@@ -326,6 +356,9 @@ EXPECT = {
     "0107-extra-file": ("rejected", "holds exactly"),
     "0108-zero-denominator": ("rejected", "zero denominator"),
     "0109-bad-utf8": ("rejected", "unreadable claim"),
+    "0110-top-level-field": ("rejected", "unknown top-level fields"),
+    "0111-repeated-key": ("rejected", "repeated key"),
+    "0112-slogan-kind": ("partial", None),
 }
 GUARD_CASES = [
     ("clean add", [("A", "claims/0200-x/claim.json"), ("A", "claims/0200-x/claim.md")], "intake", True),
@@ -342,6 +375,7 @@ GUARD_CASES = [
     ("delete a claim", [("D", "claims/0001-valid-chain/claim.md")], "intake", False),
     ("script in a claim", [("A", "claims/0200-x/run.py")], "intake", False),
     ("bad id", [("A", "claims/Evil/claim.json")], "intake", False),
+    ("newline in id", [("A", "claims/0200-x\n/claim.json"), ("A", "claims/0200-x\n/claim.md")], "intake", False),
 ]
 
 
@@ -360,6 +394,16 @@ def selftest():
     ok = bool(v["prose_flags"]) and not leaked and "every n" in prose
     fails += not ok
     print(f"{'ok  ' if ok else 'FAIL'} prose overreach        flagged {v['prose_flags']}, ledger text clean: {not leaked}")
+    # a contributor's kind name reaches the reviewer, never the ledger row (audit 11-10, B)
+    v = verify(PLANTS / "0112-slogan-kind")
+    shown, kept = " ".join(v["unbacked"]), json.dumps(ledger_row(PLANTS / "0112-slogan-kind", v), ensure_ascii=False)
+    ok = "p-is-not-np-proven" in shown and "p-is-not-np-proven" not in kept and "<unreserved kind; sha256" in kept
+    fails += not ok
+    print(f"{'ok  ' if ok else 'FAIL'} kind name off the ledger  reviewer sees it: {'p-is-not-np-proven' in shown}, ledger row clean: {"p-is-not-np-proven" not in kept}")
+    v = verify(PLANTS / "0106-unbacked-only")
+    ok = "'forall-levels'" in " ".join(v["unbacked_ledger"])
+    fails += not ok
+    print(f"{'ok  ' if ok else 'FAIL'} reserved kind kept by name  {v['unbacked_ledger'][:1]}")
     for label, changes, route, want_ok in GUARD_CASES:
         g = guard(changes)
         ok = g["route"] == route and g["ok"] == want_ok
